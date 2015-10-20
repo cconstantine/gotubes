@@ -11,7 +11,6 @@ import (
 
 var connid = uint64(0)
 var localAddr = flag.String("l", "localhost:9999", "local address")
-var remoteAddr = flag.String("r", "localhost:80", "remote address")
 var verbose = flag.Bool("v", false, "display server actions")
 var redis_client *redis.Client
 
@@ -22,9 +21,19 @@ func main() {
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
-	fmt.Printf("Proxying from %v\n", *localAddr)
 
-	laddr, err := net.ResolveTCPAddr("tcp", *localAddr)
+	s := &server{
+		localAddr: *localAddr,
+		verbose:    *verbose,
+		redis_client: redis_client,
+	}
+	s.run()
+}
+
+func (s* server) run() {
+	fmt.Printf("Proxying from %s\n", s.localAddr)
+
+	laddr, err := net.ResolveTCPAddr("tcp", s.localAddr)
 	check(err)
 	listener, err := net.ListenTCP("tcp", laddr)
 	check(err)
@@ -57,6 +66,12 @@ func main() {
 		}
 		go p.start()
 	}
+}
+
+type server struct {
+	localAddr string
+	verbose   bool
+	redis_client *redis.Client
 }
 
 //A proxy represents a pair of connections and their state
