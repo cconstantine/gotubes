@@ -1,39 +1,21 @@
-package main
+package proxy
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"gopkg.in/redis.v3"
+  "../logging"
 )
 
-var connid = uint64(0)
-var localAddr = flag.String("l", "localhost:9999", "local address")
-var verbose = flag.Bool("v", false, "display server actions")
-var redis_client *redis.Client
-
-func main() {
-	flag.Parse()
-	redis_client = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-
-	s := &server{
-		localAddr: *localAddr,
-		verbose:    *verbose,
-		redis_client: redis_client,
-	}
-	s.run()
+type PortMapper interface {
+	GetRandomPort() (string, error)
 }
 
-func (s* server) run() {
-	fmt.Printf("Proxying from %s\n", s.localAddr)
+func (s* Server) Run() {
+	logging.Info.Printf("Proxying from %s\n", s.LocalAddr)
 
-	laddr, err := net.ResolveTCPAddr("tcp", s.localAddr)
+	laddr, err := net.ResolveTCPAddr("tcp", s.LocalAddr)
 	check(err)
 	listener, err := net.ListenTCP("tcp", laddr)
 	check(err)
@@ -41,19 +23,21 @@ func (s* server) run() {
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
-			fmt.Printf("Failed to accept connection '%s'\n", err)
+			logging.Info.Printf("Failed to accept connection '%s'\n", err)
 			continue
 		}
-		connid++
+		s.Connid++
 
-		raddr_string, err := redis_client.SRandMember(*localAddr).Result()
+		raddr_string, err := s.Ports.GetRandomPort()
 		if err != nil {
-			fmt.Printf("Unable to find a proxy target: %s", err)
+			conn.Close()
+			logging.Info.Printf("Unable to find a proxy target: %s", err)
 			continue
 		}
 		raddr, err := net.ResolveTCPAddr("tcp", raddr_string)
 		if err != nil {
-			fmt.Printf("Unable to resolve target: %s", err)
+			conn.Close()
+			logging.Info.Printf("Unable to resolve target: %s", err)
 			continue
 		}
 		p := &proxy{
@@ -62,16 +46,18 @@ func (s* server) run() {
 			raddr:  raddr,
 			erred:  false,
 			errsig: make(chan bool),
-			prefix: fmt.Sprintf("Connection #%03d ", connid),
+			prefix: fmt.Sprintf("Connection #%03d ", s.Connid),
+			verbose: s.Verbose,
 		}
 		go p.start()
 	}
 }
 
-type server struct {
-	localAddr string
-	verbose   bool
-	redis_client *redis.Client
+type Server struct {
+	LocalAddr string
+	Verbose   bool
+	Connid    uint32
+	Ports     PortMapper
 }
 
 //A proxy represents a pair of connections and their state
@@ -83,12 +69,12 @@ type proxy struct {
 	erred         bool
 	errsig        chan bool
 	prefix        string
+  verbose       bool
+
 }
 
 func (p *proxy) log(s string, args ...interface{}) {
-	if *verbose {
-		fmt.Printf(p.prefix+s+"\n", args...)
-	}
+	logging.Info.Printf(p.prefix+s+"\n", args...)
 }
 
 func (p *proxy) err(s string, err error) {
@@ -145,7 +131,7 @@ func (p *proxy) pipe(src, dst *net.TCPConn, finished chan int64) {
 
 func check(err error) {
 	if err != nil {
-		fmt.Printf(err.Error())
+		logging.Info.Printf(err.Error())
 		os.Exit(1)
 	}
 }
