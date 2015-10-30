@@ -3,14 +3,16 @@ package main
 import (
   "flag"
   "./proxy"
+  "./logging"
   "gopkg.in/redis.v3"
 )
 
 
 var connid = uint64(0)
 var localAddr = flag.String("l", "localhost:9999", "local address")
+var redis_addr = flag.String("r", "localhost:6379", "address of redis server")
+
 var verbose = flag.Bool("v", false, "display server actions")
-var redis_client *redis.Client
 
 
 type RedisPorts struct {
@@ -28,8 +30,9 @@ func (rp *RedisPorts) GetRandomPort() (string, error) {
 
 func main() {
   flag.Parse()
-  redis_client = redis.NewClient(&redis.Options{
-    Addr:     "localhost:6379",
+  logging.Init(*verbose)
+  redis_client := redis.NewClient(&redis.Options{
+    Addr:     *redis_addr,
     Password: "", // no password set
     DB:       0,  // use default DB
   })
