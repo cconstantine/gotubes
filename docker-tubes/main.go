@@ -4,6 +4,7 @@ import (
   "flag"
   "math/rand"
   "errors"
+	"os"
   "sync"
   "github.com/cconstantine/gotubes/proxy"
   "github.com/cconstantine/gotubes/logging"
@@ -41,11 +42,19 @@ func NewContainerPorts() *ContainerPorts {
  container_ports := &ContainerPorts{container_ports: make(map[string]string)}
 
 
-  client, _ := docker.NewClientFromEnv()
+  client, err := docker.NewClientFromEnv()
+	if err != nil {
+		logging.Error.Printf(err.Error())
+		os.Exit(1)
+	}
 
   go container_ports.listenForEvents(client)
 
-  containers, _ := client.ListContainers(docker.ListContainersOptions{})
+  containers, err := client.ListContainers(docker.ListContainersOptions{})
+	if err != nil {
+		logging.Error.Printf(err.Error())
+		os.Exit(1)
+	}
 
   for _, event := range containers {
      container, _ := client.InspectContainer(event.ID)
