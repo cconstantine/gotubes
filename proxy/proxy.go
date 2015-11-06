@@ -5,7 +5,8 @@ import (
 	"io"
 	"net"
 	"os"
-  "../logging"
+
+  "github.com/cconstantine/gotubes/logging"
 )
 
 type PortMapper interface {
