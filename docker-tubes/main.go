@@ -10,15 +10,13 @@ import (
   "github.com/cconstantine/gotubes/logging"
   "github.com/fsouza/go-dockerclient"
 )
-var image_name = flag.String("i", "training/webapp:latest", "image to run")
+var image_name = flag.String("i", "training/webapp:latest", "Proxy connections to Image")
 
-var remoteAddr = flag.String("r", "localhost",      "remote address")
+var proxyPort = flag.String("p",  "5000", "Port to proxy")
 
-var localAddr = flag.String("l",  "localhost:9999", "local address")
 var verbose = flag.Bool("v", false, "display server actions")
 
 func main() {
-
   flag.Parse()
 
   logging.Init(*verbose)
@@ -26,7 +24,7 @@ func main() {
   container_ports := NewContainerPorts()
 
   s := &proxy.Server{
-    LocalAddr: *localAddr,
+    LocalAddr: "0.0.0.0:9999",
     Verbose:    true,
     Ports: container_ports,
   }
@@ -107,18 +105,17 @@ func (container_ports *ContainerPorts) listenForEvents(client *docker.Client) {
 func (cp* ContainerPorts) addContainer(container *docker.Container) {
   defer cp.mutx.Unlock()
   cp.mutx.Lock()
-
+  
   if container.Config.Image != *image_name {
     return
   }
 
-  for _,b := range container.NetworkSettings.Ports {
-    port := *remoteAddr + ":" + b[0].HostPort
-    cp.container_ports[container.ID] = port
+	connection_string := container.NetworkSettings.IPAddress + ":" + *proxyPort
+	cp.container_ports[container.ID] = connection_string
 
-    logging.Info.Printf("Adding a container %s: %s <-> %s\n", container.ID[:12], *localAddr, port)
-  } 
-  
+	logging.Info.Printf(
+		"Adding a container %s: %s <-> %s\n",
+		container.ID[:12], "0.0.0.0:9999", connection_string)
 }
 
 func (cp* ContainerPorts) removeContainer(container *docker.Container) {

@@ -24,7 +24,7 @@ func (s* Server) Run() {
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
-			logging.Info.Printf("Failed to accept connection '%s'\n", err)
+			logging.Error.Printf("Failed to accept connection '%s'\n", err)
 			continue
 		}
 		s.Connid++
@@ -32,13 +32,13 @@ func (s* Server) Run() {
 		raddr_string, err := s.Ports.GetRandomPort()
 		if err != nil {
 			conn.Close()
-			logging.Info.Printf("Unable to find a proxy target: %s", err)
+			logging.Error.Printf("Unable to find a proxy target: %s", err)
 			continue
 		}
 		raddr, err := net.ResolveTCPAddr("tcp", raddr_string)
 		if err != nil {
 			conn.Close()
-			logging.Info.Printf("Unable to resolve target: %s", err)
+			logging.Error.Printf("Unable to resolve target: %s", err)
 			continue
 		}
 		p := &proxy{
@@ -78,6 +78,10 @@ func (p *proxy) log(s string, args ...interface{}) {
 	logging.Info.Printf(p.prefix+s+"\n", args...)
 }
 
+func (p *proxy) trace(s string, args ...interface{}) {
+	logging.Trace.Printf(p.prefix+s+"\n", args...)
+}
+
 func (p *proxy) err(s string, err error) {
 	if p.erred {
 		return
@@ -102,7 +106,7 @@ func (p *proxy) start() {
 	defer p.rconn.Close()
 
 	//display both ends
-	p.log("Opened %s >>> %s", p.lconn.LocalAddr().String(), p.rconn.RemoteAddr().String())
+	p.trace("Opened %s >>> %s", p.lconn.LocalAddr().String(), p.rconn.RemoteAddr().String())
 	//bidirectional copy
 	lfinished := make(chan int64)
 	rfinished := make(chan int64)
@@ -120,7 +124,7 @@ func (p *proxy) start() {
 	case <-p.errsig:
 	}
 
-	p.log("Closed (%d bytes sent, %d bytes recieved)", p.sentBytes, p.receivedBytes)
+	p.trace("Closed (%d bytes sent, %d bytes recieved)", p.sentBytes, p.receivedBytes)
 }
 
 func (p *proxy) pipe(src, dst *net.TCPConn, finished chan int64) {

@@ -13,13 +13,13 @@ var (
 )
 
 func Init(verbose bool) {
-    info_writer := ioutil.Discard
+    trace_writer := ioutil.Discard
     if verbose {
-      info_writer = os.Stdout
+      trace_writer = os.Stdout
     }
-    Trace = log.New(ioutil.Discard,"TRACE: ", log.Lshortfile)
+    Trace = log.New(trace_writer, "TRACE: ", log.Lshortfile)
 
-    Info = log.New(info_writer, "INFO: ", 0)
+    Info = log.New(os.Stdout, "INFO: ", 0)
 
     Error = log.New(os.Stderr, "ERROR: ", 0)
 }
